@@ -1,0 +1,107 @@
+{
+  "log_reg": {
+    "complete_angle_areas": {
+      "const": -4.626,
+      "speed": 0.189,
+      "Imp_1": -0.039,
+      "Imp_2": 0.018,
+      "Imp_3": 0.459,
+      "Imp_4": -0.125,
+      "Imp_5": -1.413,
+      "Imp_6": -0.116,
+      "Imp_7": -1.782,
+      "Imp_8": -0.434,
+      "Imp_9": 0.482,
+      "Imp_10": 0.142,
+      "Imp_11": 0.400
+    },
+    "reduced_angle_areas": {
+      "const": -4.476,
+      "speed": 0.179,
+      "driver_side": 0.250,
+      "right_side": 0.259,
+      "rear": -0.445
+
+    },
+    "ignore_angle": {
+      "const": -4.591,
+      "speed": 0.185
+    },
+    "complete_sym_angle_areas": {
+      "const": -4.620,
+      "speed": 0.189,
+      "Imp_1_11": 0.209,
+      "Imp_2_10": 0.086,
+      "Imp_3_9": 0.470,
+      "Imp_4_8": -0.259,
+      "Imp_5_7": -1.590,
+      "Imp_6": -0.118
+    },
+    "reduced_sym_angle_areas": {
+      "const": -4.457,
+      "speed": 0.177,
+      "side": 0.244,
+      "rear": -0.431
+    }
+  },
+
+  "ref_speed": {
+    "complete_angle_areas": {
+      "ref_speed_1": 52.886,
+      "ref_speed_2": 51.995,
+      "ref_speed_3": 39.992,
+      "ref_speed_4": 56.450,
+      "ref_speed_5": 107.092,
+      "ref_speed_6": 52.623,
+      "ref_speed_7": 123.535,
+      "ref_speed_8": 68.055,
+      "ref_speed_9": 40.475,
+      "ref_speed_10": 47.301,
+      "ref_speed_11": 42.249,
+      "ref_speed_12": 48.666,
+      "exp": 1.592
+    },
+    "reduced_angle_areas": {
+      "ref_speed_front": 51.285,
+      "ref_speed_right_side": 46.452,
+      "ref_speed_rear": 66.953,
+      "ref_speed_driver_side": 47.115,
+      "exp": 1.531
+    },
+    "ignore_angle": {
+      "ref_speed": 51.144,
+      "exp": 1.570
+    },
+    "complete_sym_angle_areas": {
+      "ref_speed_1_11": 46.717,
+      "ref_speed_2_10": 49.427,
+      "ref_speed_3_9": 40.298,
+      "ref_speed_4_8": 61.349,
+      "ref_speed_5_7": 115.139,
+      "ref_speed_6": 52.787,
+      "ref_speed_12": 48.783,
+      "exp": 1.589
+    },
+    "reduced_sym_angle_areas": {
+      "ref_speed_front": 51.287,
+      "ref_speed_side": 46.774,
+      "ref_speed_rear": 66.956,
+      "exp": 1.531
+    }
+  },
+
+  "gidas": {
+    "const": -5.820,
+    "speed": 0.292
+  },
+
+  "pedestrian": {
+    "const": 3.164,
+    "speed": 0.288
+  },
+
+  "pedestrian_MAIS2+": {
+    "const": 1.786,
+    "speed": 0.259
+  }
+}

@@ -1,0 +1,16 @@
+{
+    "bayes": 33.3,
+    "equality": 33.3,
+    "maximin": 33.3,
+    "responsibility": 0.0,
+    "ego": 0.0,
+    "risk_cost": 250,
+    "visible_area": 0,
+    "lon_jerk": 0.0,
+    "lat_jerk": 0.0,
+    "velocity": 1.0,
+    "dist_to_global_path": 10.0,
+    "travelled_dist": 0.0,
+    "dist_to_goal_pos": 0.0,
+    "dist_to_lane_center": 0.0
+}

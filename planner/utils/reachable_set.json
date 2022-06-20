@@ -1,0 +1,13 @@
+{
+    "parameters":{
+        "dt": 0.2,
+        "t_max": 2,
+        "a_max": 8,
+        "depth": 3
+    },
+    "rules":{
+        "safe_distance":{
+            "safe_distance_frac": 1.0
+        }
+    }
+}

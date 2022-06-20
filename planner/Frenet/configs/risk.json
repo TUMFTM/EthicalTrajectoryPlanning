@@ -1,0 +1,21 @@
+{
+  "harm_mode": "log_reg",
+  "sensor_occlusion_model": false,
+  "occlusion_mode" : false,
+  "ignore_angle": false,
+  "sym_angle": true,
+  "reduced_angle_areas": true,
+  "trajectory_risk": "max",
+  "max_acceptable_risk": 1,
+
+  "scale_factor_time": 0.9,
+  "crash_angle_accuracy": 10,
+  "crash_angle_simplified": true,
+
+  "figures": {
+    "create_figures": false,
+    "number_plotted_trajectories": 3
+  },
+  "risk_dashboard": false,
+  "collision_report": true
+}

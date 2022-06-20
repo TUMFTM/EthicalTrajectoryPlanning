@@ -1,0 +1,14 @@
+{
+    "pred_config_path": "prediction/configs/best_config.json",
+    "pred_model_path": "prediction/trained_models/best_model.tar",
+    "gpu": "0",
+    "min_obs_length": 0,
+    "on_pred_learn_method": null,
+    "on_pred_horizon": null,
+    "on_lr": null,
+    "on_pred_learn_density": null,
+    "online_layer": null,
+    "on_loss": null,
+    "on_optimizer": null,
+    "on_train_loss_th": null
+}
