@@ -59,7 +59,7 @@ By default logs are saved and can be analyzed afterwards by running:
 
 ## How to reproduce results
 
-The idea and basic principles of this algorithm are presented in XXX 2022<sup>1</sup>. The following describes how the results from the paper can be reproduced. To evaluate the planning algorithm on multiple scenarios execute:
+The idea and basic principles of this algorithm are presented in Geisslinger et al. 2022<sup>1</sup>. The following describes how the results from the paper can be reproduced. To evaluate the planning algorithm on multiple scenarios execute:
 
 * `python planner/Frenet/plannertools/evaluatefrenet.py`
 
@@ -71,7 +71,7 @@ To evaluate with the according config settings of [ethical](/planner/Frenet/conf
 
 To evaluate on all 2000 scenarios, make sure to have at least 200 GB space left on your device for saving the log files. For better runtime, we recommend using [multiprocessing](/planner/Frenet/plannertools/evaluatefrenet.py#L46) and a [GPU](planner/Frenet/configs/prediction.json#L4) for the prediction network. Evaluating all scenarios in 10 parallel threads with a GPU takes around 48 hours. Results and logfiles for each run are stored in `planner/Frenet/results`.
 
-Standard evaluation metrics such as cummulated harm on all scenarios are provided within the results (e.g. `results/eval/harm.json`). `planner/Frenet/analyze_tools/analyze_risk_dist.py` helps to extract risk values out of multiple logfiles. Boxplots with risk distribtuions as in (Geisslinger et al. 2022)<sup>1</sup> can be generated using `planner/Frenet/plot_tools/boxplots_risks.py`.
+Standard evaluation metrics such as cummulated harm on all scenarios are provided within the results (e.g. `results/eval/harm.json`). `planner/Frenet/analyze_tools/analyze_risk_dist.py` helps to extract risk values out of multiple logfiles. Boxplots with risk distribtuions as in Geisslinger et al. 2022<sup>1</sup> can be generated using `planner/Frenet/plot_tools/boxplots_risks.py`.
 
 
 ## References
