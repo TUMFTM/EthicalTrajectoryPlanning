@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/491550412.svg)](https://zenodo.org/badge/latestdoi/491550412)
+
 # An Ethical Trajectory Planning Algorithm for Autonomous Vehicles
 
 <img src="./readme/overview.png" width="770" height="300">
