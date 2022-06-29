@@ -1,5 +1,8 @@
 [![DOI](https://zenodo.org/badge/491550412.svg)](https://zenodo.org/badge/latestdoi/491550412)
-
+[![Linux](https://svgshare.com/i/Zhy.svg)](https://svgshare.com/i/Zhy.svg)
+[![Python 3.8](https://img.shields.io/badge/python-3.8-blue.svg)](https://www.python.org/downloads/release/python-380/)
+[![GPLv3 license](https://img.shields.io/badge/License-GPLv3-blue.svg)](http://perso.crans.org/besson/LICENSE.html)
+[![GitHub version](https://badge.fury.io/gh/TUMFTM%2FEthicalTrajectoryPlanning.svg)](https://badge.fury.io/gh/TUMFTM%2FEthicalTrajectoryPlanning)
 # An Ethical Trajectory Planning Algorithm for Autonomous Vehicles
 
 <img src="./readme/overview.png" width="770" height="300">
