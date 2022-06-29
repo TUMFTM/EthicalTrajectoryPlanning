@@ -44,6 +44,8 @@ To run the ethical planner on an exemplary default scenario, execute the followi
     
 * `python planner/Frenet/frenet_planner.py`
 
+![Exemplary Result](readme/running_sample.gif)
+
 You will see a live visualization of the scenario being solved by the planner.
 Now you can start with your own experiments by changing the [configs](/planner/Frenet/configs/README.md) or selecting another scenario by adding
 
