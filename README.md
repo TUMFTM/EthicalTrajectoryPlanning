@@ -42,7 +42,7 @@ We recommend using an isolated [virtual environment](https://pypi.org/project/vi
     [Results](#how-to-reproduce-results) were obtained with commonroad-scenarios at commit `35b9cfb5b89d33249ea0d5507b9465650ebeb289`.
     Instead of cloning you can download and unpack this commit directly with:
     
-    `wget -c  https://gitlab.lrz.de/tum-cps/commonroad-scenarios/-/archive/35b9cfb5b89d33249ea0d5507b9465650ebeb289/commonroad-scenarios-               35b9cfb5b89d33249ea0d5507b9465650ebeb289.tar.gz -O - | tar -xz`
+    `wget -c  https://gitlab.lrz.de/tum-cps/commonroad-scenarios/-/archive/35b9cfb5b89d33249ea0d5507b9465650ebeb289/commonroad-scenarios-35b9cfb5b89d33249ea0d5507b9465650ebeb289.tar.gz -O - | tar -xz`
 
 ## Quick Start Demo
 
