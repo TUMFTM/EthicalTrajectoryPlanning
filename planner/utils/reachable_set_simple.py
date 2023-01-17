@@ -2,8 +2,8 @@
 
 import numpy as np
 import math
-import shapely.geometry
 from EthicalTrajectoryPlanning.planner.utils import shapely_conversions
+import pygeos
 
 
 class ReachSetSimple(object):
@@ -42,31 +42,23 @@ class ReachSetSimple(object):
         # intersection with reachable set)
         if bound_l is not None and bound_r is not None:
             if closed:
-                polygon_l = shapely.geometry.Polygon(bound_l)
-                polygon_r = shapely.geometry.Polygon(bound_r)
-
-                if polygon_l.area > polygon_r.area:
-                    self.__intersection_patch = polygon_l.difference(polygon_r)
+                polygon_l_r = pygeos.polygons([bound_l, bound_r])
+                areas = pygeos.area(polygon_l_r)
+                if areas[0] > areas[1]:
+                    self.__intersection_patch_pygeos = pygeos.difference(polygon_l_r[0], polygon_l_r[1])
                 else:
-                    self.__intersection_patch = polygon_r.difference(polygon_l)
+                    self.__intersection_patch_pygeos = pygeos.difference(polygon_l_r[1], polygon_l_r[0])
             else:
-                self.__intersection_patch = shapely.geometry.Polygon(
+                self.__intersection_patch_pygeos = pygeos.polygons(
                     np.row_stack((bound_l, np.flipud(bound_r)))
                 )
-
         else:
-            self.__intersection_patch = None
+            self.__intersection_patch_pygeos = None
 
     def calc_reach_set(
         self,
-        obj_pos: np.ndarray,
-        obj_heading: float,
-        obj_vel: float,
-        obj_length: float,
-        obj_width: float,
-        dt: float,
-        t_max: float,
-        a_max: float,
+        srs,
+        srs_t
     ) -> dict:
         """
         Calculate a simple reachable set approximation, trimmed to bounds.
@@ -91,46 +83,32 @@ class ReachSetSimple(object):
                     a np.ndarray with columns [x, y]
 
         """
-        # calculate reachable set
-        srs = simple_reachable_set(
-            obj_pos=obj_pos,
-            obj_heading=obj_heading,
-            obj_vel=obj_vel,
-            obj_length=obj_length,
-            obj_width=obj_width,
-            dt=dt,
-            t_max=t_max,
-            a_max=a_max,
-        )
-
+        # move simple_reachable_set() out to the caller function calc_reach_sets()
         # if provided, trim reachable set to track
-        if self.__intersection_patch is not None:
-            for t_key in srs.keys():
-                srs_t = shapely.geometry.Polygon(srs[t_key])
+        if self.__intersection_patch_pygeos is not None:
+            # replace shapely by pygeos
+            srs_t_intersection = pygeos.intersection(srs_t, self.__intersection_patch_pygeos)
+            key_list = list(srs.keys())
+            type_ids = pygeos.get_type_id(srs_t_intersection)
+            for i in range(len(key_list)):
 
-                srs_t = srs_t.intersection(self.__intersection_patch)
-
-                # if coordinates present (not wiped out completely),
-                # extract outline coordinates
-                red_tmp = shapely_conversions.extract_polygon_outline(
-                    shapely_geometry=srs_t
-                )
+                red_tmp_pygeos = shapely_conversions.extract_polygon_outline_pygeos(srs_t_intersection[i], type_ids[i])
 
                 # add outline coordinates to reach set
-                if red_tmp is not None:
-                    srs[t_key] = red_tmp
+                if red_tmp_pygeos is not None:
+                    srs[key_list[i]] = red_tmp_pygeos
 
         return srs
 
     @property
-    def intersection_patch(self):
+    def intersection_patch_pygeos(self):
         """
         Get intersection patch.
 
         Returns:
             The intersection patch.
         """
-        return self.__intersection_patch
+        return self.__intersection_patch_pygeos
 
 
 def simple_reachable_set(
@@ -306,12 +284,150 @@ def calc_acc_rad(amax: float, dt: float, t_max: float) -> list:
     :returns:
         * **racc** -    sequence of radii
     """
-    racc = []
-    for t in np.arange(0.0, t_max + dt / 2, dt):
-        racc.append(0.5 * amax * t ** 2)
+    # racc = []
+    # for t in np.arange(0.0, t_max + dt / 2, dt):
+    #     racc.append(0.5 * amax * t ** 2)
+    racc = 0.5 * amax * np.arange(0.0, t_max + dt / 2, dt) ** 2
     return racc
 
 
+# def calc_vertices(
+#     pos: np.ndarray,
+#     cvehicle: np.ndarray,
+#     bx_bound: np.ndarray,
+#     globalangle: float,
+#     racc: list,
+#     dt: float,
+#     veh_length: float = 0.0,
+#     veh_width: float = 0.0,
+# ) -> dict:
+#     """
+#     Calculate the vertices of the enveloping polygon.
+
+#     .. code-block::
+
+#               q2-----q3
+#             -        |
+#         q1           |
+#          |           |
+#         q6           |
+#             -        |
+#               q5-----q4
+
+#     Calculation of over-approximation polygon for each step.
+#     Method based on "SPOT: A Tool for Set-Based Prediction of
+#     Traffic Participants" by M. Koschi and M. Althoff
+
+
+#     :param pos:              position of the vehicle [in m]
+#     :param cvehicle:         center positions of vehicle
+#                              at future time-stamps (along longitudinal axis)
+#     :param bx_bound:         front extension of overapprox.
+#                              reach set (based on Althoff)
+#     :param globalangle:      angle [in rad]
+#     :param racc:             radius of reachable area
+#                              at certain points in time [in m]
+#     :param dt:               temporal increment between pose predictions [in s]
+#     :param veh_length:       (optional) vehicle length [in m],
+#                              if not provided, reach-set for
+#                              point-mass is calculated
+#     :param veh_width:        (optional) vehicle width [in m],
+#                              if not provided, reach-set for
+#                              point-mass is calculated
+#     :returns:
+#         * **polypred** -     dict of reachable areas with:
+
+#             * keys holding the evaluated time-stamps
+#             * values holding the outlining coordinates
+#                 as a np.ndarray with columns [x, y]
+
+#     :Authors:
+#         * Yves Huberty
+#         * Tim Stahl <tim.stahl@tum.de>
+
+#     :Created on:
+#         27.01.2020
+
+#     """
+#     # initialize empty polygon dict
+#     polypred = {}
+
+#     # init vehicle dimension array
+#     veh_dim = (
+#         np.array(
+#             [
+#                 [-veh_length, veh_width],
+#                 [-veh_length, veh_width],
+#                 [veh_length, veh_width],
+#                 [veh_length, -veh_width],
+#                 [-veh_length, -veh_width],
+#                 [-veh_length, -veh_width],
+#             ]
+#         )
+#         / 2.0
+#     )
+
+#     prev_front = -99.0
+#     prev_r_t = 0.0
+#     for j in range(cvehicle.shape[0]):
+#         # retrieve relevant parameters
+#         if j > 0:
+#             r_t = racc[j - 1]
+#             c_t = cvehicle[j - 1]
+#             b_t = bx_bound[j - 1]
+#         else:
+#             r_t = 0.0
+#             c_t = 0.0
+#             b_t = 0.0
+#         r_t1 = racc[j]
+#         c_t1 = cvehicle[j]
+
+#         # calculate basic polygon (in plane)
+#            prev_r_t = poly[0, 1]
+
+#         # add vehicle dimensions
+#         poly = poly + veh_dim
+
+#         # rotate and translate
+#         for i in range(np.shape(poly)[0]):
+#             poly[i, :] = rotate_vector(poly[i, :], globalangle) + np.transpose(pos)
+
+#         # add to polypred
+#         polypred[round(dt * j, 2)] = poly
+
+#     return polypred
+
+# @njit(cache=True)        [b_t, r_t1],  # q2
+#                 [c_t1 + r_t1, r_t1],  # q3
+#                 [c_t1 + r_t1, -r_t1],  # q4
+#                 [b_t, -r_t1],  # q5
+#                 [c_t - r_t, -r_t],
+#             ]
+#         )  # q6
+
+#            prev_r_t = poly[0, 1]
+
+#         # add vehicle dimensions
+#         poly = poly + veh_dim
+
+#         # rotate and translate
+#         for i in range(np.shape(poly)[0]):
+#             poly[i, :] = rotate_vector(poly[i, :], globalangle) + np.transpose(pos)
+
+#         # add to polypred
+#         polypred[round(dt * j, 2)] = poly
+
+#     return polypred
+
+# @njit(cache=True)# prevent from driving backwards when reaching v=0
+#         if poly[0, 0] < prev_front:
+#             poly[0, 0] = prev_front
+#             poly[0, 1] = prev_r_t
+#             poly[-1, 0] = prev_front
+#             poly[-1, 1] = -prev_r_t
+
+#         else:
+#         
 def calc_vertices(
     pos: np.ndarray,
     cvehicle: np.ndarray,
@@ -390,6 +506,11 @@ def calc_vertices(
 
     prev_front = -99.0
     prev_r_t = 0.0
+
+    # calculate sin and cos before for loop
+    s = np.sin(globalangle)
+    c = np.cos(globalangle)
+
     for j in range(cvehicle.shape[0]):
         # retrieve relevant parameters
         if j > 0:
@@ -428,12 +549,17 @@ def calc_vertices(
 
         # add vehicle dimensions
         poly = poly + veh_dim
-
+        # use numpy broadcasting and array operation
         # rotate and translate
-        for i in range(np.shape(poly)[0]):
-            poly[i, :] = rotate_vector(poly[i, :], globalangle) + np.transpose(pos)
+        poly_new = np.zeros_like(poly)
+        poly_new[:, 0] = c * poly[:, 0] - s * poly[:, 1]
+        poly_new[:, 1] = s * poly[:, 0] + c * poly[:, 1]
+        # xnew = c * poly[:, 0] - s * poly[:, 1]
+        # ynew = s * poly[:, 0] + c * poly[:, 1]
 
+        res_array = poly_new + np.transpose(pos)
+        # res_array = np.stack((xnew, ynew), axis=-1) + np.transpose(pos)
+        # print(np.all(res_array==res_array_test))
         # add to polypred
-        polypred[round(dt * j, 2)] = poly
-
+        polypred[round(dt * j, 2)] = res_array
     return polypred

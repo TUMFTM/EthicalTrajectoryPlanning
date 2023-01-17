@@ -29,10 +29,7 @@ from EthicalTrajectoryPlanning.risk_assessment.helpers.collision_helper_function
 )
 from EthicalTrajectoryPlanning.risk_assessment.utils.logistic_regression_symmetrical import get_protected_inj_prob_log_reg_ignore_angle
 from EthicalTrajectoryPlanning.planner.Frenet.utils.helper_functions import create_tvobstacle
-from EthicalTrajectoryPlanning.planner.Frenet.configs.load_json import (
-    load_harm_parameter_json,
-    load_risk_json,
-)
+from EthicalTrajectoryPlanning.planner.Frenet.configs.load_json import load_harm_parameter_json
 from commonroad.scenario.obstacle import (
     ObstacleRole,
     ObstacleType,
@@ -201,7 +198,7 @@ class ScenarioHandler:
 
     def _check_collision(self, agent, time_step):
         # check if the current state is collision-free
-        vis = load_risk_json()
+        vis = self.planner_creator.settings["risk_dict"]
         coeffs = load_harm_parameter_json()
 
         # get ego position and orientation

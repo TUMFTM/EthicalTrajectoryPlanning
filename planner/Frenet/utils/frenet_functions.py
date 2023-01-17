@@ -262,20 +262,77 @@ def calc_frenet_trajectories(
             with timer.time_with_cm(
                 "simulation/calculate trajectories/calculate quartic polynomial"
             ):
+                # use universal function feature to perform array operation
                 # time vector
-                t = list(np.arange(0.0, tT, dt))
+                t = np.arange(0.0, tT, dt)
                 # longitudinal position and derivatives
-                s = [qp_long.calc_point(t) for t in t]
-                s_d = [qp_long.calc_first_derivative(t) for t in t]
-                s_dd = [qp_long.calc_second_derivative(t) for t in t]
-                s_ddd = [qp_long.calc_third_derivative(t) for t in t]
+                s = qp_long.calc_point(t)
+                s_d = qp_long.calc_first_derivative(t)
+                s_dd = qp_long.calc_second_derivative(t)
+                s_ddd = qp_long.calc_third_derivative(t)
+            with timer.time_with_cm(
+                "simulation/calculate trajectories/calculate global trajectory/calculate reference points"
+            ):
+                # use CubicSpineLine's internal function to perform array operation
+                # calculate the position of the reference path
+                global_path_x, global_path_y = csp.calc_position(s)
+                # global_path_x = np.zeros(len(s),dtype=np.float64)
+                # global_path_y = np.zeros(len(s),dtype=np.float64)
+
+                # for i in range(len(s)):
+                #     global_path_x[i] = csp.sx(s[i])
+                #     global_path_y[i] = csp.sy(s[i])
+
+            # move gradient calculation and deviation calculation out from calc_global_trajectory(), avoid unnecessary repeat calculation
+            with timer.time_with_cm(
+                "simulation/calculate trajectories/calculate global trajectory/calculate reference gradients"
+            ):
+                # calculate derivations necessary to get the curvature
+                dx = np.gradient(global_path_x, s)
+                ddx = np.gradient(dx, s)
+                dddx = np.gradient(ddx, s)
+                dy = np.gradient(global_path_y, s)
+                ddy = np.gradient(dy, s)
+                dddy = np.gradient(ddy, s)
+
+            with timer.time_with_cm(
+                "simulation/calculate trajectories/calculate global trajectory/calculate reference yaw"
+            ):
+                # calculate yaw of the global path
+                global_path_yaw = np.arctan2(dy, dx)
+
+            with timer.time_with_cm(
+                "simulation/calculate trajectories/calculate global trajectory/calculate reference curvature"
+            ):
+                # calculate the curvature of the global path
+                global_path_curv = (np.multiply(dx, ddy) - np.multiply(ddx, dy)) / (
+                    np.power(dx, 2) + np.power(dy, 2) ** (3 / 2)
+                )
+
+            with timer.time_with_cm(
+                "simulation/calculate trajectories/calculate global trajectory/calculate reference curvature derivation"
+            ):
+                # calculate the derivation of the global path's curvature
+                z = np.multiply(dx, ddy) - np.multiply(ddx, dy)
+                z_d = np.multiply(dx, dddy) - np.multiply(dddx, dy)
+                n = (np.power(dx, 2) + np.power(dy, 2)) ** (3 / 2)
+                n_d = (3 / 2) * np.multiply(
+                    np.power((np.power(dx, 2) + np.power(dy, 2)), 0.5),
+                    (2 * np.multiply(dx, ddx) + 2 * np.multiply(dy, ddy)),
+                )
+                global_path_curv_d = (np.multiply(z_d, n) - np.multiply(z, n_d)) / (
+                    np.power(n, 2)
+                )
 
             s0 = s[0]
+            ds = s[-1] - s0
             # all lateral distances
             for dT in d_list:
                 # quintic polynomial in lateral direction
                 # for high velocities we have ds/dt and dd/dt
-                ds = s[-1] - s0
+                if ds <= abs(dT):
+                    continue
+
                 if lat_mode == "high_velocity":
 
                     with timer.time_with_cm(
@@ -294,14 +351,19 @@ def calc_frenet_trajectories(
                     with timer.time_with_cm(
                         "simulation/calculate trajectories/calculate quintic polynomial"
                     ):
+
+                        # use universal function feature to perform array operation
                         # lateral distance and derivatives
-                        d = [qp_lat.calc_point(t) for t in t]
-                        d_d = [qp_lat.calc_first_derivative(t) for t in t]
-                        d_dd = [qp_lat.calc_second_derivative(t) for t in t]
-                        d_ddd = [qp_lat.calc_third_derivative(t) for t in t]
+                        d = qp_lat.calc_point(t)
+                        d_d = qp_lat.calc_first_derivative(t)
+                        d_dd = qp_lat.calc_second_derivative(t)
+                        d_ddd = qp_lat.calc_third_derivative(t)
 
                     d_d_time = d_d
                     d_dd_time = d_dd
+                    d_d = d_d / s_d
+                    d_dd = (d_dd - d_d * s_dd) / np.power(s_d, 2)
+
                 # for low velocities, we have ds/dt and dd/ds
                 elif lat_mode == "low_velocity":
                     # singularity
@@ -337,34 +399,53 @@ def calc_frenet_trajectories(
                     with timer.time_with_cm(
                         "simulation/calculate trajectories/calculate quintic polynomial"
                     ):
+                        # use universal function feature to perform array operation
                         # lateral distance and derivatives
-                        d = [qp_lat.calc_point(s - s0) for s in s]
-                        d_d = [qp_lat.calc_first_derivative(s - s0) for s in s]
-                        d_dd = [qp_lat.calc_second_derivative(s - s0) for s in s]
-                        d_ddd = [qp_lat.calc_third_derivative(s - s0) for s in s]
+                        d = qp_lat.calc_point(s - s0)
+                        d_d = qp_lat.calc_first_derivative(s - s0)
+                        d_dd = qp_lat.calc_second_derivative(s - s0)
+                        d_ddd = qp_lat.calc_third_derivative(s - s0)
 
                     # since dd/ds, a conversion to dd/dt is needed
-                    d_d_time = [s_d[i] * d_d[i] for i in range(len(d))]
-                    d_dd_time = [
-                        s_dd[i] * d_d[i] + (s_d[i] ** 2) * d_dd[i]
-                        for i in range(len(d))
-                    ]
+                    d_d_time = s_d * d_d
+                    d_dd_time = s_dd * d_d + np.power(s_d, 2) * d_dd
+
+                # with timer.time_with_cm(
+                #     "simulation/calculate trajectories/calculate global trajectory/total"
+                # ):
 
                 with timer.time_with_cm(
-                    "simulation/calculate trajectories/calculate global trajectory/total"
+                    "simulation/calculate trajectories/calculate global trajectory/calculate trajectory states"
                 ):
-                    # calculate global path with the cubic spline planner (input is s, ds/dt, dds/ddt and for high velocities, d, dd/dt, ddd/ddt is later converted to d, dd/ds, ddd/dds)
-                    x, y, yaw, curv, v, a = calc_global_trajectory(
-                        csp=csp,
-                        s=s,
-                        s_d=s_d,
-                        s_dd=s_dd,
-                        d=d,
-                        d_d_lat=d_d,
-                        d_dd_lat=d_dd,
-                        lat_mode=lat_mode,
-                        exec_timer=timer,
-                    )
+                    yaw_diff_array = np.arctan(d_d / (1 - global_path_curv * d))
+                    yaw = yaw_diff_array + global_path_yaw
+                    x = global_path_x - d * np.sin(global_path_yaw)
+                    y = global_path_y + d * np.cos(global_path_yaw)
+                    v = (s_d * (1 - global_path_curv * d)) / np.cos(yaw_diff_array)
+                    curv = (
+                        (
+                            (
+                                d_dd
+                                + (global_path_curv_d * d + global_path_curv * d_d)
+                                * np.tan(yaw_diff_array)
+                            )
+                            * (np.power(np.cos(yaw_diff_array), 2) / (1 - global_path_curv * d))
+                        )
+                        + global_path_curv
+                    ) * (np.cos(yaw_diff_array) / (1 - global_path_curv * d))
+
+                    # transform acceleration
+                    # a = s_dd * ((1 - global_path_curv * d) / np.cos(yaw_diff_array)) + (
+                    #     np.power(s_d , 2) / (np.cos(yaw_diff_array))
+                    # ) * (
+                    #     (1 - global_path_curv * d)
+                    #     * np.tan(yaw_diff_array)
+                    #     * (
+                    #         curv * ((1 - global_path_curv * d) / np.cos(yaw_diff_array))
+                    #         - global_path_curv
+                    #     )
+                    #     - (global_path_curv_d * d + global_path_curv * d_d)
+                    # )
 
                 with timer.time_with_cm(
                     "simulation/calculate trajectories/initialize trajectory"
@@ -387,8 +468,8 @@ def calc_frenet_trajectories(
                         curv=curv,
                     )
 
-                if ds > abs(dT):
-                    fp_list.append(fp)
+                # if ds > abs(dT):
+                fp_list.append(fp)
 
     return fp_list
 
@@ -718,11 +799,12 @@ def get_v_list(
     # return for the linspace mode
     if mode == "linspace":
         if v_goal_min is None:
-            return np.linspace(v_min, v_max, n_samples)
+            v_list = np.linspace(v_min, v_max, n_samples - 1)
         else:
-            return np.linspace(
-                max(min(v_goal_min, v_min), 0.001), max(v_goal_max, v_max), n_samples
+            v_list = np.linspace(
+                max(min(v_goal_min, v_min), 0.001), max(v_goal_max, v_max), n_samples - 1
             )
+        return np.append(v_list, v_cur)
 
     # check if n_samples is valid for the chosen mode
     if mode == "deterministic":

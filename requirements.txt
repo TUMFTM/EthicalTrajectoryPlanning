@@ -1,9 +1,9 @@
 commonroad-io==2020.3
-commonroad-drivability-checker==2021.4.1
+commonroad-drivability-checker
 commonroad-helper-functions==1.0.0
 commonroad-agent==1.1.0
 wale-net==2.0.2
-numpy~=1.21.6
+numpy~=1.19.5
 matplotlib~=3.2.2
 progressbar2
 argparse~=1.4.0
@@ -16,3 +16,6 @@ numba~=0.50.1
 tqdm~=4.47.0
 setuptools~=49.2.0
 networkx==2.5
+pandas~=1.4.3
+statsmodels~=0.13.2
+pygeos~=0.13

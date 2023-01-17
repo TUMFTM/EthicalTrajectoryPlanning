@@ -292,6 +292,7 @@ class EvalFilesGenerator:
         self._create_harm_evaluation()
         self._create_eval_statistic_exec_times_dict()
         self._store_weights()
+        self._store_settings()
 
     def _create_completion_list(self):
         """WIP."""
@@ -489,3 +490,13 @@ class EvalFilesGenerator:
 
         with open(file_path, "w") as output:
             json.dump(weights, output, indent=6)
+
+    def _store_settings(self):
+        file_path = self.dataset_evaluator.eval_directory.joinpath("settings").with_suffix(
+            ".json"
+        )
+        settings = self.dataset_evaluator.scenario_evaluator.planner_creator.settings
+        settings["frenet_settings"]["frenet_parameters"]["d_list"] = settings["frenet_settings"]["frenet_parameters"]["d_list"].tolist()
+
+        with open(file_path, "w") as output:
+            json.dump(settings, output, indent=6)

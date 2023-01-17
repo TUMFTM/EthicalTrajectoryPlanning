@@ -14,7 +14,6 @@ from commonroad_dc.collision.trajectory_queries import trajectory_queries
 from EthicalTrajectoryPlanning.planner.utils.timers import ExecTimer
 from EthicalTrajectoryPlanning.planner.Frenet.utils.helper_functions import (
     create_tvobstacle,
-    get_max_curvature,
 )
 from EthicalTrajectoryPlanning.planner.Frenet.utils.prediction_helpers import (
     collision_checker_prediction,
@@ -80,14 +79,17 @@ def check_validity(
     ):
         # check maximum curvature
         reason_curvature_invalid = curvature_valid(ft, vehicle_params)
+
         if reason_curvature_invalid is not None:
             return 0, f"curvature ({reason_curvature_invalid})"
 
     with timer.time_with_cm(
         "simulation/sort trajectories/check validity/check collision"
     ):
+
         # get collision_object
         collision_object = create_collision_object(ft, vehicle_params, ego_state)
+
         # collision checkking with obstacles
         if not collision_valid(
             ft,
@@ -104,9 +106,13 @@ def check_validity(
         "simulation/sort trajectories/check validity/check road boundaries"
     ):
         # check road boundaries
-        if not boundary_valid(vehicle_params, collision_object, road_boundary):
-            return 2, "boundaries"
-
+        # if ft.bd_harm is calculated, use it for boundary check
+        if predictions is None:
+            if not boundary_valid(vehicle_params, collision_object, road_boundary):
+                return 2, "boundaries"
+        else:
+            if ft.bd_harm:
+                return 2, "boundaries"
     with timer.time_with_cm(
         "simulation/sort trajectories/check validity/check max risk"
     ):
@@ -118,10 +124,7 @@ def check_validity(
 
 def create_collision_object(ft, vehicle_params, ego_state):
     """Create a collision_object of the trajectory for collision checking with road boundary and with other vehicles."""
-    traj_list = []
-    for i in range(len(ft.t)):
-        traj_list.append([ft.x[i], ft.y[i], ft.yaw[i]])
-
+    traj_list = [[ft.x[i], ft.y[i], ft.yaw[i]] for i in range(len(ft.t))]
     collision_object_raw = create_tvobstacle(
         traj_list=traj_list,
         box_length=vehicle_params.l / 2,
@@ -148,10 +151,14 @@ def velocity_valid(ft, vehicle_params):
     Returns:
         [bool]: [True if valid, false else]
     """
-    for vi in ft.s_d:
-        if np.abs(vi) > vehicle_params.longitudinal.v_max:
-            return False
-    return True
+    # for vi in ft.s_d:
+    #     if np.abs(vi) > vehicle_params.longitudinal.v_max:
+    #         return False
+    # return True
+    if np.all(np.abs(ft.s_d) <= vehicle_params.longitudinal.v_max):
+        return True
+    else:
+        return False
 
 
 def acceleration_valid(ft, vehicle_params):
@@ -180,14 +187,29 @@ def curvature_valid(ft, vehicle_params):
     Returns:
         [bool]: [True if valid, false else]
     """
-    for i in range(len(ft.t)):
-        ci = ft.curv[i]
-        c_max_current, vel_mode = get_max_curvature(
-            vehicle_params=vehicle_params, v=ft.v[i]
-        )
-        if np.abs(ci) > c_max_current:
-            return vel_mode
+    # numpy absolute value array operation
+    # calculate velocity threshold out of for loop
+    # calculate the turning radius
+    turning_radius = np.sqrt(
+        (vehicle_params.l ** 2 / np.tan(vehicle_params.steering.max) ** 2)
+        + (vehicle_params.l_r ** 2)
+    )
+    # below this velocity, it is assumed that the vehicle can follow the turning radius
+    # above this velocity, the curvature is calculated differently
+    threshold_low_velocity = np.sqrt(vehicle_params.lateral_a_max * turning_radius)
 
+    c = abs(ft.curv)
+    for i in range(len(ft.t)):
+        # get curvature via turning radius
+        if ft.v[i] < threshold_low_velocity:
+            c_max_current, vel_mode = 1.0 / turning_radius, "lvc"
+        # get velocity dependent curvature (curvature derived from the lateral acceleration)
+        else:
+            c_max_current = vehicle_params.lateral_a_max / (ft.v[i] ** 2)
+            vel_mode = "hvc"
+
+        if c[i] > c_max_current:
+            return vel_mode
     return None
 
 

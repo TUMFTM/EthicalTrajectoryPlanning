@@ -9,9 +9,12 @@ from commonroad.common.file_reader import CommonRoadFileReader
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.widgets import CheckButtons
+from matplotlib.colors import ListedColormap
 import numpy as np
+import pandas as pd
 import argparse
 from scipy import stats
+from statsmodels.formula.api import ols
 
 mopl_path = os.path.dirname(
     os.path.dirname(
@@ -29,6 +32,7 @@ from EthicalTrajectoryPlanning.planner.Frenet.utils.visualization import (
 )
 from EthicalTrajectoryPlanning.planner.planning import add_ego_vehicles_to_scenario
 from EthicalTrajectoryPlanning.planner.utils.vehicleparams import VehicleParameters
+from EthicalTrajectoryPlanning.risk_assessment.helpers.coll_prob_helpers import distance
 
 
 class FrenetLogVisualizer:
@@ -135,6 +139,10 @@ class FrenetLogVisualizer:
 
             # Get number of lines
             self._no_lines_data = len(self._all_log_data)
+
+        else:
+            print(f"Logfile {logfile} does not exist.")
+            sys.exit()
 
     def _load_scenario(self, scneario_id):
 
@@ -408,60 +416,183 @@ class FrenetLogVisualizer:
 
     def correlation_matrix(self, plot=True):
         """Calculate and visualize correlation matrix."""
-        self.all_weighted_cost_dict = {}
+        all_weighted_cost_dict = self._get_all_weighted_cost_dict()
+
+        corr_mat = np.zeros(
+            (len(all_weighted_cost_dict), len(all_weighted_cost_dict))
+        )
+        for key1, x in enumerate(all_weighted_cost_dict.values()):
+            for key2, y in enumerate(all_weighted_cost_dict.values()):
+                correlation, p_value = stats.pearsonr(x, y)
+                corr_mat[key1, key2] = correlation
+
+        if plot:
+            self._draw_corr_mat(corr_mat, all_weighted_cost_dict)
+
+        return corr_mat, list(all_weighted_cost_dict.keys())
+
+    def multi_correlation(self, use_keys=None):
+        """Calculate coefficients of multiple correlation.
+
+        See: https://en.wikipedia.org/wiki/Coefficient_of_multiple_correlatio
+        """
+        all_weighted_cost_dict = self._get_all_weighted_cost_dict()
+
+        if use_keys is not None:
+            all_weighted_cost_dict = {k: v for k, v in all_weighted_cost_dict.items() if k in use_keys}
+
+        multi_corr_dict = analyze_multi_correlation(all_weighted_cost_dict)
+
+        return multi_corr_dict
+
+    def distance_matrix(self, plot=False):
+        """Calculate distances for the best chosen trajectory according to each principle."""
+        self.long_dict = {}
+        self.lat_dict = {}
+
         weights = self.weights
+        weights["total"] = -1
 
         for key in weights:
             if weights[key] != 0 and "risk" not in key:
-                self.all_weighted_cost_dict[key] = []
+                self.long_dict[key] = []
+                self.lat_dict[key] = []
 
-        for key in self.all_weighted_cost_dict:
+                for data in self._all_log_data:
+                    (_, _, ft_list_valid, _, _, _, _) = data
+
+                    best_traj = self._get_best_traj_for_principle(ft_list_valid, key)
+                    self.long_dict[key].append(best_traj["s"][-1])
+                    self.lat_dict[key].append(best_traj["d"][-1])
+
+        long_mat = np.zeros(
+            (len(self.long_dict), len(self.long_dict))
+        )
+        long_std = np.zeros(
+            (len(self.long_dict), len(self.long_dict))
+        )
+        lat_mat = np.zeros(
+            (len(self.lat_dict), len(self.lat_dict))
+        )
+        lat_std = np.zeros(
+            (len(self.lat_dict), len(self.lat_dict))
+        )
+        dist_mat = np.zeros(
+            (len(self.lat_dict), len(self.lat_dict))
+        )
+        dist_std = np.zeros(
+            (len(self.lat_dict), len(self.lat_dict))
+        )
+
+        for key1, x in enumerate(self.long_dict.values()):
+            for key2, y in enumerate(self.long_dict.values()):
+                diff = [a - b for a, b in zip(x, y)]
+                long_mat[key1, key2] = np.mean(np.abs(diff))
+                long_std[key1, key2] = np.std(np.abs(diff))
+
+        for key1, x in enumerate(self.lat_dict.values()):
+            for key2, y in enumerate(self.lat_dict.values()):
+                diff = [a - b for a, b in zip(x, y)]
+                lat_mat[key1, key2] = np.mean(np.abs(diff))
+                lat_std[key1, key2] = np.std(np.abs(diff))
+
+        for key1, (x, y) in enumerate(zip(self.lat_dict.values(), self.long_dict.values())):
+            for key2, (xx, yy) in enumerate(zip(self.lat_dict.values(), self.long_dict.values())):
+                diff = [distance([a, b], [aa, bb]) for a, b, aa, bb in zip(x, y, xx, yy)]
+                dist_mat[key1, key2] = np.mean(np.abs(diff))
+                dist_std[key1, key2] = np.std(np.abs(diff))
+
+        if plot:
+            self._draw_corr_mat(lat_mat, self.lat_dict, stdw_mat=lat_std, inverse=True, title="Lateral Distance Matrix")
+            self._draw_corr_mat(long_mat, self.long_dict, stdw_mat=long_std, inverse=True, title="Longitudinal Distance Matrix")
+            self._draw_corr_mat(dist_mat, self.lat_dict, stdw_mat=dist_std, inverse=True, title="Total Distance Matrix")
+            plt.show()
+
+        return long_mat, lat_mat, dist_mat
+
+    def _get_all_weighted_cost_dict(self):
+        all_weighted_cost_dict = {}
+        weights = self.weights
+
+        for key in weights:
+            if weights[key] > 0 and "risk" not in key:
+                all_weighted_cost_dict[key] = []
+
+        for key in all_weighted_cost_dict:
             for data in self._all_log_data:
-                (_, _, ft_list_valid, ft_list_invalid, _, _, _) = data
+                (_, _, ft_list_valid, _, _, _, _) = data
 
-                for traj in ft_list_valid + ft_list_invalid:
+                for traj in ft_list_valid:
                     if key in self.risk_keys:
-                        self.all_weighted_cost_dict[key].append(
+                        all_weighted_cost_dict[key].append(
                             traj["cost_dict"]["risk_cost_dict"][key]
                             * weights[key]
                             * weights["risk_cost"]
                         )
                     else:
-                        self.all_weighted_cost_dict[key].append(
+                        all_weighted_cost_dict[key].append(
                             traj["cost_dict"]["unweighted_cost"][key] * weights[key]
                         )
 
-        corr_mat = np.zeros(
-            (len(self.all_weighted_cost_dict), len(self.all_weighted_cost_dict))
-        )
-        for key1, x in enumerate(self.all_weighted_cost_dict.values()):
-            for key2, y in enumerate(self.all_weighted_cost_dict.values()):
-                correlation, p_value = stats.pearsonr(x, y)
-                corr_mat[key1, key2] = correlation
+        return all_weighted_cost_dict
 
-        if plot:
-            self._draw_corr_mat(corr_mat)
+    def _get_best_traj_for_principle(self, traj_list, cost_key):
 
-        return corr_mat, list(self.all_weighted_cost_dict.keys())
+        curr_best_weighted_cost = np.inf
+        weights = self.weights
 
-    def _draw_corr_mat(self, corr_mat):
-        fig = plt.figure("Correlation Matrix", figsize=(9, 8))
+        for traj in traj_list:
+            if cost_key in self.risk_keys:
+                weighted_cost = traj["cost_dict"]["risk_cost_dict"][cost_key] * weights[cost_key] * weights["risk_cost"]
+
+            elif cost_key == "total":
+                weighted_cost = traj["cost"]
+            else:
+                weighted_cost = traj["cost_dict"]["unweighted_cost"][cost_key] * weights[cost_key]
+
+            if weighted_cost < curr_best_weighted_cost:
+                curr_best_weighted_cost = weighted_cost
+                curr_best_traj = traj
+
+        return curr_best_traj
+
+    def _draw_corr_mat(self, corr_mat, raw_dict, stdw_mat=None, inverse=False, title="Confusion Matrix"):
+        fig = plt.figure(title, figsize=(9, 8))
         ax = fig.add_subplot(111)
+
+        top = plt.cm.get_cmap('Oranges_r', 128)
+        bottom = plt.cm.get_cmap('Blues', 128)
+
+        newcolors = np.vstack((top(np.linspace(0, 1, 128)), bottom(np.linspace(0, 1, 128))))
+        newcmp = ListedColormap(newcolors, name='OrangeBlue')
+
+        if inverse:
+            cmap = newcmp
+        else:
+            cmap = plt.cm.RdYlGn
+
         im = ax.imshow(
             corr_mat,
             aspect='auto',
-            cmap=plt.cm.RdYlGn,
+            cmap=cmap,
             interpolation='nearest',
         )
 
-        ax.set_xticks(np.arange(len(self.all_weighted_cost_dict)))
-        ax.set_yticks(np.arange(len(self.all_weighted_cost_dict)))
-        ax.set_xticklabels(list(self.all_weighted_cost_dict.keys()))
-        ax.set_yticklabels(list(self.all_weighted_cost_dict.keys()))
+        ax.set_xticks(np.arange(len(raw_dict)))
+        ax.set_yticks(np.arange(len(raw_dict)))
+        ax.set_xticklabels(list(raw_dict.keys()))
+        ax.set_yticklabels(list(raw_dict.keys()))
 
         fig.colorbar(im)
 
-        plt.show()
+        for i in range(len(raw_dict)):
+            for j in range(len(raw_dict)):
+                if stdw_mat is not None:
+                    text_str = "{0:.1f}\n{1:.1f}".format(corr_mat[i, j], stdw_mat[i, j])
+                else:
+                    text_str = "{0:.1f}".format(corr_mat[i, j])
+
+                ax.text(j, i, text_str, ha="center", va="center", color="black")
 
     def _visualize_selected(self, label):
         """
@@ -490,6 +621,35 @@ class AttrDict(dict):
         self.__dict__ = self
 
 
+def analyze_multi_correlation(data):
+    """Analyze correlation between multiple principles.
+
+    Args:
+        data (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    multi_corr_dict = {}
+
+    df = pd.DataFrame(data=data)
+
+    for key in data:
+        reg_str = key + " ~"
+        for key2 in data:
+            if key != key2:
+                reg_str += " + " + key2
+
+        reg_model = ols(reg_str, data=df).fit()
+        multi_corr_dict[key] = {
+            "r_value": np.sqrt(reg_model.rsquared)
+        }
+        for idx, val in zip(reg_model.params.index, reg_model.params.values):
+            multi_corr_dict[key][idx] = val
+
+    return multi_corr_dict
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--logfile", type=str, default=None)
@@ -498,6 +658,8 @@ if __name__ == '__main__':
     logvisualizer = FrenetLogVisualizer(args.logfile, visualize=True)
 
     # Show correlation matrix of cost terms
+    # logvisualizer.multi_correlation()
+    # logvisualizer.distance_matrix(plot=True)
     # logvisualizer.correlation_matrix()
 
     logvisualizer.visualize()

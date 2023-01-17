@@ -10,7 +10,7 @@ if __name__ == "__main__":
         DatasetEvaluator,
     )
     from EthicalTrajectoryPlanning.planner.Frenet.plannertools.frenetcreator import FrenetCreator
-    from EthicalTrajectoryPlanning.planner.Frenet.configs.load_json import load_planning_json, load_weight_json
+    from EthicalTrajectoryPlanning.planner.Frenet.configs.load_json import load_planning_json, load_weight_json, load_risk_json
 
 
 if __name__ == "__main__":
@@ -18,6 +18,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', default="ethical")
+    parser.add_argument('--settings', default=None)
     parser.add_argument("--all", action="store_true")
     args = parser.parse_args()
 
@@ -27,6 +28,11 @@ if __name__ == "__main__":
         pathlib.Path(__file__).resolve().parents[1].joinpath("results").joinpath("eval")
     )
     weights = load_weight_json(filename=f"weights_{args.weights}.json")
+    if args.settings is None:
+        risk_dict = load_risk_json()
+    else:
+        risk_dict = load_risk_json(filename=f"risk_{args.settings}.json")
+    settings_dict["risk_dict"] = risk_dict
 
     # Create the frenet creator
     frenet_creator = FrenetCreator(settings_dict, weights=weights)

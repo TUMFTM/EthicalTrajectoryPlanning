@@ -4,11 +4,13 @@ import json
 import numpy as np
 
 from commonroad.scenario.scenario import Scenario
-from shapely.geometry import Polygon
 from EthicalTrajectoryPlanning.planner.GlobalPath.lanelet_based_planner import (
     find_lanelet_by_position_and_orientation,
 )
 from EthicalTrajectoryPlanning.planner.utils import reachable_set_simple
+from EthicalTrajectoryPlanning.planner.utils.reachable_set_simple import simple_reachable_set
+from EthicalTrajectoryPlanning.planner.utils.responsibility import polygon_padding
+import pygeos
 
 
 class ReachSet(object):
@@ -92,6 +94,20 @@ class ReachSet(object):
             obstacles = self.scenario.obstacles
 
         self.reach_sets[ego_state.time_step] = {}
+        # calculate polygon array for self._reach_set_difference(), avoid repeating
+        b_dict = {}
+        for step in self.ego_reach_set[ego_state.time_step][0]:
+            b_poly_pygeos = [b_set[step] for b_set in self.ego_reach_set[ego_state.time_step]]
+            len_max = max(len(b_set[step]) for b_set in self.ego_reach_set[ego_state.time_step])
+            b_poly_pygeos = polygon_padding(len_max, b_poly_pygeos)
+            b_poly_pygeos = pygeos.polygons(b_poly_pygeos)
+            # b_poly_pygeos_test = [pygeos.polygons(b_set[step]) for b_set in self.ego_reach_set[ego_state.time_step]]
+
+            b_poly_pygeos = pygeos.union_all(b_poly_pygeos)
+
+            # b[step] = b_poly
+            b_dict[step] = b_poly_pygeos
+
         # uncomment to log ego
         # self.reach_sets[ego_state.time_step][self.ego_id] = self.ego_reach_set[ego_state.time_step]
         for obstacle in obstacles:
@@ -129,29 +145,57 @@ class ReachSet(object):
                                 self.reach_set_objs[lnlet_id].append(obj)
 
                 self.reach_sets[ego_state.time_step][o_id] = []
+
+                # call simple_reachable_set() before for loop, avoid unnecessary repeating
+                srs = simple_reachable_set(
+                    obj_pos=obstacle.prediction.trajectory.state_list[
+                        ego_state.time_step
+                    ].position,
+                    obj_heading=obstacle.prediction.trajectory.state_list[
+                        ego_state.time_step
+                    ].orientation,
+                    obj_vel=obstacle.prediction.trajectory.state_list[
+                        ego_state.time_step
+                    ].velocity,
+                    obj_length=obstacle.obstacle_shape.length,
+                    obj_width=obstacle.obstacle_shape.width,
+                    dt=self.reach_set_params["parameters"]["dt"],
+                    t_max=self.reach_set_params["parameters"]["t_max"],
+                    a_max=self.reach_set_params["parameters"]["a_max"]
+                )
+                srs_t = pygeos.polygons([srs[t_key] for t_key in srs.keys()])
+
                 for l_id in l_ids:
                     for reach_set_obj in self.reach_set_objs[l_id]:
-                        rs = reach_set_obj.calc_reach_set(
-                            obj_pos=obstacle.prediction.trajectory.state_list[
-                                ego_state.time_step
-                            ].position,
-                            obj_heading=obstacle.prediction.trajectory.state_list[
-                                ego_state.time_step
-                            ].orientation,
-                            obj_vel=obstacle.prediction.trajectory.state_list[
-                                ego_state.time_step
-                            ].velocity,
-                            obj_length=obstacle.obstacle_shape.length,
-                            obj_width=obstacle.obstacle_shape.width,
-                            dt=self.reach_set_params["parameters"]["dt"],
-                            t_max=self.reach_set_params["parameters"]["t_max"],
-                            a_max=self.reach_set_params["parameters"]["a_max"],
-                        )
+                        # adjust call of calc_reach_set()
+                        # rs = reach_set_obj.calc_reach_set(
+                        #     obj_pos=obstacle.prediction.trajectory.state_list[
+                        #         ego_state.time_step
+                        #     ].position,
+                        #     obj_heading=obstacle.prediction.trajectory.state_list[
+                        #         ego_state.time_step
+                        #     ].orientation,
+                        #     obj_vel=obstacle.prediction.trajectory.state_list[
+                        #         ego_state.time_step
+                        #     ].velocity,
+                        #     obj_length=obstacle.obstacle_shape.length,
+                        #     obj_width=obstacle.obstacle_shape.width,
+                        #     dt=self.reach_set_params["parameters"]["dt"],
+                        #     t_max=self.reach_set_params["parameters"]["t_max"],
+                        #     a_max=self.reach_set_params["parameters"]["a_max"],
+                        # )
+                        rs = reach_set_obj.calc_reach_set(srs, srs_t)
+
                         if "safe_distance" in self.reach_set_params["rules"]:
+
+                            # adjust call of self._reach_set_difference()
                             # subtract safe distance polygon
+                            # reach_set_diffs = self._reach_set_difference(
+                            #     rs, self.ego_reach_set[ego_state.time_step]
+                            # )
                             reach_set_diffs = self._reach_set_difference(
-                                rs, self.ego_reach_set[ego_state.time_step]
-                            )
+                                rs, b_dict)
+
                             self.reach_sets[ego_state.time_step][o_id] += reach_set_diffs
                         else:
                             self.reach_sets[ego_state.time_step][o_id].append(rs)
@@ -262,68 +306,107 @@ class ReachSet(object):
                 final = [l for l in final if l not in parallel or l == lnlet]
         return set(final)
 
-    def _reach_set_difference(self, a, b):
+    def _reach_set_difference(self, a, b_dict):
         """
         Calculate the difference between two reachable sets.
 
         Subtracts b from a.
         """
-        rs_list = []
-        for step in a:
-            a_poly = Polygon(a[step])
-            b_poly = Polygon()
-            for b_set in b:
-                poly = Polygon(b_set[step])
-                b_poly = b_poly.union(poly)
+        rs_list_pygeos = []
 
-            diff = a_poly.difference(b_poly)
-            rs_list += self._geom_to_reach_set(diff, step)
-        return rs_list
+        a_poly_pygeos = [a[step] for step in a]
+        len_max = max(len(a[step]) for step in a)
+        a_poly_pygeos = polygon_padding(len_max, a_poly_pygeos)
+        a_poly_pygeos = pygeos.polygons(a_poly_pygeos)
 
-    def _add_safe_distance(self, rs, rs_obj, safe_distance_frac, velocity):
+        # a_poly_pygeos_test = [pygeos.polygons(a[step]) for step in a]
+
+        diff_pygeos = pygeos.difference(a_poly_pygeos, [b_dict[step] for step in a])
+        key_list = list(a.keys())
+        for i in range(len(key_list)):
+            rs_list_pygeos += self._geom_to_reach_set(diff_pygeos[i], key_list[i])
+        return rs_list_pygeos
+
+    def _add_safe_distance(self, rs, rs_obj, safe_distance):
         """
         Extend a reachable set in longitudinal direction.
 
         Extend a reachable set in longitudinal direction.
         Applys the two-second heuristic for safe distances.
         """
-        # 2-second safe distance heuristic
-        # urban scenarios (< 30 km/h)
-        if velocity <= 8:
-            safe_distance_factor = 0.75
-        # built-up area / residential area (< 54 km/h)
-        elif velocity <= 15:
-            safe_distance_factor = 1.0
-        # freeway (>= 54 km/h)
-        else:
-            safe_distance_factor = 2.0
-        min_safe_distance = safe_distance_factor * velocity
-        safe_distance = min_safe_distance * safe_distance_frac
+        # move safe_distance calculation out to caller function
+        # # 2-second safe distance heuristic
+        # # urban scenarios (< 30 km/h)
+        # if velocity <= 8:
+        #     safe_distance_factor = 0.75
+        # # built-up area / residential area (< 54 km/h)
+        # elif velocity <= 15:
+        #     safe_distance_factor = 1.0
+        # # freeway (>= 54 km/h)
+        # else:
+        #     safe_distance_factor = 2.0
+        # min_safe_distance = safe_distance_factor * velocity
+        # safe_distance = min_safe_distance * safe_distance_frac
 
+        # # Lane bounds used for reach set
+        # patch = rs_obj.intersection_patch_pygeos
+        # extended = {}
+        # for step in rs:
+        #     poly = Polygon(rs[step])
+        #     buffer = Polygon(poly.buffer(safe_distance).exterior)
+        #     if patch is not None:
+        #         # trim extended with patch
+        #         intersection = patch.intersection(buffer)
+        #         if intersection.geom_type == "Polygon" and not intersection.is_empty:
+        #             # convert intersection poly to points
+        #             outline = list(zip(*intersection.exterior.coords.xy))
+        #             extended[step] = np.array(outline)
+        #         else:
+        #             # intersection is no polygon
+        #             # extended[step] = rs[step]
+        #             raise ValueError(
+        #                 "Unhandled geometry type: " + repr(intersection.geom_type)
+        #             )
+        #     elif buffer.geom_type == "Polygon" and not buffer.is_empty:
+        #         outline = list(zip(*buffer.exterior.coords.xy))
+        #         extended[step] = np.array(outline)
+        #     else:
+        #         extended[step] = rs[step]
+
+# replace shapely operations by pygeos
         # Lane bounds used for reach set
-        patch = rs_obj.intersection_patch
+        patch = rs_obj.intersection_patch_pygeos
         extended = {}
-        for step in rs:
-            poly = Polygon(rs[step])
-            buffer = Polygon(poly.buffer(safe_distance).exterior)
-            if patch is not None:
+        poly_pygeos = [rs[step] for step in rs]
+        len_max = max(len(rs[step]) for step in rs)
+        poly_pygeos = polygon_padding(len_max, poly_pygeos)
+        poly_pygeos = pygeos.polygons(poly_pygeos)
+        # poly_pygeos = [pygeos.polygons(rs[step]) for step in rs]
+        buffer_pygeos = pygeos.polygons(pygeos.get_exterior_ring(pygeos.buffer(poly_pygeos, safe_distance, quadsegs=16)))
+        key_list = list(rs.keys())
+        if patch is not None:
+            intersection_pygeos = pygeos.intersection(patch, buffer_pygeos)
+            for i in range(len(key_list)):
                 # trim extended with patch
-                intersection = patch.intersection(buffer)
-                if intersection.geom_type == "Polygon" and not intersection.is_empty:
+                # if intersection.geom_type == "Polygon" and not intersection.is_empty:
+                if pygeos.get_type_id(intersection_pygeos[i]) == 3 and not pygeos.is_empty(intersection_pygeos[i]):
                     # convert intersection poly to points
-                    outline = list(zip(*intersection.exterior.coords.xy))
-                    extended[step] = np.array(outline)
+                    outline = pygeos.get_coordinates(pygeos.get_exterior_ring(intersection_pygeos[i]))
+                    extended[key_list[i]] = outline
                 else:
-                    # intersection is no polygon
-                    # extended[step] = rs[step]
+                    # raise ValueError(
+                    #     "Unhandled geometry type: " + repr(intersection.geom_type)
+                    # )
                     raise ValueError(
-                        "Unhandled geometry type: " + repr(intersection.geom_type)
+                        "Unhandled geometry type: " + str(pygeos.get_type_id(intersection_pygeos[i]))
                     )
-            elif buffer.geom_type == "Polygon" and not buffer.is_empty:
-                outline = list(zip(*buffer.exterior.coords.xy))
-                extended[step] = np.array(outline)
-            else:
-                extended[step] = rs[step]
+        else:
+            for i in range(len(key_list)):
+                if pygeos.get_type_id(buffer_pygeos[i]) == 3 and not pygeos.is_empty(buffer_pygeos[i]):
+                    outline = pygeos.get_coordinates(pygeos.get_exterior_ring(buffer_pygeos[i]))
+                    extended[key_list[i]] = outline
+                else:
+                    extended[key_list[i]] = rs[key_list[i]]
         return extended
 
     def _geom_to_reach_set(self, geometry, step):
@@ -334,18 +417,21 @@ class ReachSet(object):
         """
         rs_list = []
         # if polygons don't intersect, the result is a MultiPolygon
-        if geometry.geom_type == "Polygon":
-            if geometry.is_empty:
+        # if geometry.geom_type == "Polygon":
+        if pygeos.get_type_id(geometry) == 3:
+            if pygeos.is_empty(geometry):
                 return rs_list
             # convert difference to points
             rs = {}
             rs[step] = self._get_points_of_polygon(geometry)
             rs_list.append(rs)
-        elif geometry.geom_type == "MultiPolygon":
-            for poly in geometry:
-                rs_list += self._geom_to_reach_set(poly, step)
+        # elif geometry.geom_type == "MultiPolygon":
+        elif pygeos.get_type_id(geometry) == 6:
+            for i in range(pygeos.get_num_geometries(geometry)):
+                rs_list += self._geom_to_reach_set(pygeos.get_geometry(geometry, i), step)
         else:
-            raise ValueError("Unhandled geometry type: " + repr(geometry.geom_type))
+            # raise ValueError("Unhandled geometry type: " + repr(geometry.geom_type))
+            raise ValueError("Unhandled geometry type: " + str(pygeos.get_type_id(geometry)))
         return rs_list
 
     def _get_points_of_polygon(self, polygon):
@@ -355,10 +441,16 @@ class ReachSet(object):
         Convert a shapely polygon to a numpy array
         with columns [x,y].
         """
+        # replace polygon coordinates extraction for shapely by pygeos
+        # interior_line = []
+        # for interior in polygon.interiors:
+        #     interior_line = list(zip(*interior.coords.xy))
+        # outline = list(zip(*polygon.exterior.coords.xy))
+        # return np.array(outline + interior_line)
         interior_line = []
-        for interior in polygon.interiors:
-            interior_line = list(zip(*interior.coords.xy))
-        outline = list(zip(*polygon.exterior.coords.xy))
+        for i in range(pygeos.get_num_interior_rings(polygon)):
+            interior_line = pygeos.get_coordinates(pygeos.get_interior_ring(polygon, i)).tolist()
+        outline = pygeos.get_coordinates(pygeos.get_exterior_ring(polygon)).tolist()
         return np.array(outline + interior_line)
 
     def _ego_reach_set(self, ego_state):
@@ -385,25 +477,54 @@ class ReachSet(object):
             self.reach_set_objs_single[l_id].append(obj)
 
         self.ego_reach_set[ego_state.time_step] = []
+
+        # call simple_reachable_set() before for loop, avoid unnecessary repeating
+        # calculate reachable set
+        srs = simple_reachable_set(
+            obj_pos=ego_state.position,
+            obj_heading=ego_state.orientation,
+            obj_vel=ego_state.velocity,
+            obj_length=self.ego_length,
+            obj_width=self.ego_width,
+            dt=self.reach_set_params["parameters"]["dt"],
+            t_max=self.reach_set_params["parameters"]["t_max"],
+            a_max=0.01,
+        )
+        srs_t = pygeos.polygons([srs[t_key] for t_key in srs.keys()])
+
+        # calculate safe_distance before for loop
+        # 2-second safe distance heuristic
+        # urban scenarios (< 30 km/h)
+        if ego_state.velocity <= 8:
+            safe_distance_factor = 0.75
+        # built-up area / residential area (< 54 km/h)
+        elif ego_state.velocity <= 15:
+            safe_distance_factor = 1.0
+        # freeway (>= 54 km/h)
+        else:
+            safe_distance_factor = 2.0
+        min_safe_distance = safe_distance_factor * ego_state.velocity
+        safe_distance = min_safe_distance * self.reach_set_params["rules"]["safe_distance"]["safe_distance_frac"]
+
         for reach_set_obj in self.reach_set_objs_single[l_id]:
             # reach set for ego assumes constant acceleration
             # essentially, this is the center of the vehicle,
             # given its current velocity
-            rs = reach_set_obj.calc_reach_set(
-                obj_pos=ego_state.position,
-                obj_heading=ego_state.orientation,
-                obj_vel=ego_state.velocity,
-                obj_length=self.ego_length,
-                obj_width=self.ego_width,
-                dt=self.reach_set_params["parameters"]["dt"],
-                t_max=self.reach_set_params["parameters"]["t_max"],
-                a_max=0.01,
-            )
+            # rs = reach_set_obj.calc_reach_set(
+            #     obj_pos=ego_state.position,
+            #     obj_heading=ego_state.orientation,
+            #     obj_vel=ego_state.velocity,
+            #     obj_length=self.ego_length,
+            #     obj_width=self.ego_width,
+            #     dt=self.reach_set_params["parameters"]["dt"],
+            #     t_max=self.reach_set_params["parameters"]["t_max"],
+            #     a_max=0.01,
+            # )
+            rs = reach_set_obj.calc_reach_set(srs, srs_t)
             extended_rs = self._add_safe_distance(
                 rs,
                 reach_set_obj,
-                self.reach_set_params["rules"]["safe_distance"]["safe_distance_frac"],
-                ego_state.velocity,
+                safe_distance
             )
             self.ego_reach_set[ego_state.time_step].append(extended_rs)
 

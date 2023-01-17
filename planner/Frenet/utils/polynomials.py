@@ -67,10 +67,10 @@ class quintic_polynomial:
         xt = (
             self.a0
             + self.a1 * t
-            + self.a2 * t ** 2
-            + self.a3 * t ** 3
-            + self.a4 * t ** 4
-            + self.a5 * t ** 5
+            + self.a2 * np.power(t, 2)
+            + self.a3 * np.power(t, 3)
+            + self.a4 * np.power(t, 4)
+            + self.a5 * np.power(t, 5)
         )
 
         return xt
@@ -85,12 +85,19 @@ class quintic_polynomial:
         Returns:
             float: First derivative at time t.
         """
+        # xt = (
+        #     self.a1
+        #     + 2 * self.a2 * t
+        #     + 3 * self.a3 * t ** 2
+        #     + 4 * self.a4 * t ** 3
+        #     + 5 * self.a5 * t ** 4
+        # )
         xt = (
             self.a1
             + 2 * self.a2 * t
-            + 3 * self.a3 * t ** 2
-            + 4 * self.a4 * t ** 3
-            + 5 * self.a5 * t ** 4
+            + 3 * self.a3 * np.power(t, 2)
+            + 4 * self.a4 * np.power(t, 3)
+            + 5 * self.a5 * np.power(t, 4)
         )
 
         return xt
@@ -105,11 +112,17 @@ class quintic_polynomial:
         Returns:
             float: Second derivative at time t.
         """
+        # xt = (
+        #     2 * self.a2
+        #     + 6 * self.a3 * t
+        #     + 12 * self.a4 * t ** 2
+        #     + 20 * self.a5 * t ** 3
+        # )
         xt = (
             2 * self.a2
             + 6 * self.a3 * t
-            + 12 * self.a4 * t ** 2
-            + 20 * self.a5 * t ** 3
+            + 12 * self.a4 * np.power(t, 2)
+            + 20 * self.a5 * np.power(t, 3)
         )
 
         return xt
@@ -124,7 +137,8 @@ class quintic_polynomial:
         Returns:
             float: Third derivative at time t.
         """
-        xt = 6 * self.a3 + 24 * self.a4 * t + 60 * self.a5 * t ** 2
+        # xt = 6 * self.a3 + 24 * self.a4 * t + 60 * self.a5 * t ** 2
+        xt = 6 * self.a3 + 24 * self.a4 * t + 60 * self.a5 * np.power(t, 2)
 
         return xt
 

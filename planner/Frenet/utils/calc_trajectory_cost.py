@@ -117,7 +117,7 @@ def calc_trajectory_costs(
 
             ego_cost = get_ego_costs(ego_risk_max=traj.ego_risk_dict, boundary_harm=traj.bd_harm)
 
-            responsibility_cost = get_responsibility_cost(
+            responsibility_cost, bool_contain_cache = get_responsibility_cost(
                 scenario=scenario,
                 traj=traj,
                 ego_state=ego_state,
@@ -155,24 +155,33 @@ def calc_trajectory_costs(
         "simulation/sort trajectories/calculate costs/calculate responsibility/total"
     ):
         if weights["responsibility"] > 0.0:
-            responsibility_cost = 0.0
-            for obj_id, rs in reach_set.reach_sets[ego_state.time_step].items():
-                # time_steps = [float(list(entry.keys())[0]) for entry in rs]
-                responsibility = True
-                for part_set in rs:
-                    time_t = list(part_set.keys())[0]
-                    time_step = int(time_t / dt - 1)
+            if bool_contain_cache is not None:
+                key_list = list(reach_set.reach_sets[ego_state.time_step].keys())
+                for i in range(len(key_list)):
+                    if 1 not in bool_contain_cache[i]:
+                        obj_id = key_list[i]
+                        traj.risk_dict["responsibility"] -= traj.obst_risk_dict[obj_id]
+                        traj.risk_dict["total"] -= traj.obst_risk_dict[obj_id]
 
-                    ego_pos = Point(traj.x[time_step], traj.y[time_step])
-                    obj_rs = Polygon(list(part_set.values())[0])
+            else:
+                responsibility_cost = 0.0
+                for obj_id, rs in reach_set.reach_sets[ego_state.time_step].items():
+                    # time_steps = [float(list(entry.keys())[0]) for entry in rs]
+                    responsibility = True
+                    for part_set in rs:
+                        time_t = list(part_set.keys())[0]
+                        time_step = int(time_t / dt - 1)
 
-                    if obj_rs.contains(ego_pos):
-                        responsibility = False
-                        break
+                        ego_pos = Point(traj.x[time_step], traj.y[time_step])
+                        obj_rs = Polygon(list(part_set.values())[0])
 
-                if responsibility:
-                    traj.risk_dict["responsibility"] -= traj.obst_risk_dict[obj_id]
-                    traj.risk_dict["total"] -= traj.obst_risk_dict[obj_id]
+                        if obj_rs.contains(ego_pos):
+                            responsibility = False
+                            break
+
+                    if responsibility:
+                        traj.risk_dict["responsibility"] -= traj.obst_risk_dict[obj_id]
+                        traj.risk_dict["total"] -= traj.obst_risk_dict[obj_id]
 
     with timer.time_with_cm(
         "simulation/sort trajectories/calculate costs/calculate visible area"
@@ -310,7 +319,7 @@ def calc_trajectory_costs(
         "simulation/sort trajectories/calculate costs/multiply weights and costs"
     ):
         curr_weights = {}
-        if validity_level < 10:
+        if validity_level < 10 and modes["multiple_cost_functions"]:
             for key in weights:
                 if key in RISK_COSTS_KEY:
                     curr_weights[key] = weights[key]

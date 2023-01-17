@@ -15,6 +15,7 @@ class FrenetCreator(PlannerCreator):
         # Settings specific for a frenet planner.
         self.show_visualization = settings["evaluation_settings"]["show_visualization"]
         self.frenet_settings = settings["frenet_settings"]
+        self.settings = settings
         self.weights = weights
 
     def get_planner(self, scenario_handler, ego_vehicle_id):
@@ -41,6 +42,7 @@ class FrenetCreator(PlannerCreator):
             plot_frenet_trajectories=self.show_visualization,
             frenet_parameters=self.frenet_settings["frenet_parameters"],
             weights=self.weights,
+            settings=self.settings,
         )
 
     @staticmethod

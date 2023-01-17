@@ -4,6 +4,8 @@ import json
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 import numpy as np
+import argparse
+import os
 
 TUM_BLUE = (0 / 255, 101 / 255, 189 / 255)
 TUM_BLUE_TRANS20 = (0 / 255, 101 / 255, 189 / 255, 0.2)
@@ -86,58 +88,80 @@ def box_plot(data, edge_color, fill_color):
     return bp
 
 
-with open('./planner/Frenet/results/corr_dict.json') as json_file:
-    data = json.load(json_file)
+def plot_and_save(plt_data, title):
+    """Plot and save.
 
-key_list = [
-    "bayes",
-    "equality",
-    "maximin",
-    "responsibility",
-    "ego",
-    "velocity",
-    "dist_to_global_path",
-]
-mean_dict = {key: np.mean(data[key]) for key in data}
-
-corr_mat = np.zeros((len(key_list), len(key_list)))
-for id1, key1 in enumerate(key_list):
-    for id2, key2 in enumerate(key_list):
-        if id1 == id2:
-            corr_mat[id1, id2] = 1
-
-        else:
-            for keypair in mean_dict:
-                if key1 in keypair and key2 in keypair:
-                    corr_mat[id1, id2] = mean_dict[keypair]
-
-fig = plt.figure("Correlation Matrix", figsize=(9, 8))
-ax = fig.add_subplot(111)
-im = ax.imshow(
-    corr_mat,
-    aspect='auto',
-    cmap=newcmp,  # plt.cm.RdYlBu,
-    interpolation='nearest',
-)
-
-ax.set_xticks(np.arange(len(key_list)))
-ax.set_yticks(np.arange(len(key_list)))
-ax.set_xticklabels(key_list)
-ax.set_yticklabels(key_list)
-
-cbar = fig.colorbar(im)
-im.set_clim(-1, 1)
-plt.savefig("./planner/Frenet/results/correlations.pdf")
+    Args:
+        plt_data (_type_): _description_
+        title (_type_): _description_
+    """
+    _, ax1 = plt.subplots()
+    _ = box_plot(plt_data.values(), TUM_DARKBLUE, TUM_LIGHTBLUE)
+    ax1.set_xticklabels(plt_data.keys(), rotation=90)
+    plt.tight_layout()
+    plt.savefig(os.path.join(args.resultdir, title + ".pdf"))
 
 
-data = {key: data[key] for key in data if key in PLOT_LIST}
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--resultdir", type=str, default="./planner/Frenet/results")
+    args = parser.parse_args()
 
-fig, ax = plt.subplots()
-bp = box_plot(data.values(), TUM_DARKBLUE, TUM_LIGHTBLUE)
+    with open(os.path.join(args.resultdir, 'corr_dict.json')) as json_file:
+        corr_data = json.load(json_file)
 
-ax.set_xticklabels(data.keys(), rotation=90)
+    with open(os.path.join(args.resultdir, 'long_dict.json')) as json_file:
+        long_data = json.load(json_file)
 
-plt.tight_layout()
-plt.savefig("./planner/Frenet/results/correlations_boxplot.pdf")
+    with open(os.path.join(args.resultdir, 'lat_dict.json')) as json_file:
+        lat_data = json.load(json_file)
 
-print("Done.")
+    key_list = [
+        "bayes",
+        "equality",
+        "maximin",
+        "responsibility",
+        "ego",
+        "velocity",
+        "dist_to_global_path",
+    ]
+    mean_dict = {key: np.mean(corr_data[key]) for key in corr_data}
+
+    corr_mat = np.zeros((len(key_list), len(key_list)))
+    for id1, key1 in enumerate(key_list):
+        for id2, key2 in enumerate(key_list):
+            if id1 == id2:
+                corr_mat[id1, id2] = 1
+
+            else:
+                for keypair in mean_dict:
+                    if key1 in keypair and key2 in keypair:
+                        corr_mat[id1, id2] = mean_dict[keypair]
+
+    fig = plt.figure("Correlation Matrix", figsize=(9, 8))
+    ax = fig.add_subplot(111)
+    im = ax.imshow(
+        corr_mat,
+        aspect='auto',
+        cmap=newcmp,  # plt.cm.RdYlBu,
+        interpolation='nearest',
+    )
+
+    ax.set_xticks(np.arange(len(key_list)))
+    ax.set_yticks(np.arange(len(key_list)))
+    ax.set_xticklabels(key_list)
+    ax.set_yticklabels(key_list)
+
+    cbar = fig.colorbar(im)
+    im.set_clim(-1, 1)
+    plt.savefig(os.path.join(args.resultdir, "correlations.pdf"))
+
+    # corr_data = {key: corr_data[key] for key in corr_data if key in PLOT_LIST}
+    # long_data = {key: long_data[key] for key in long_data if key in PLOT_LIST}
+    # lat_data = {key: lat_data[key] for key in lat_data if key in PLOT_LIST}
+
+    plot_and_save(corr_data, "correlations_boxplot")
+    plot_and_save(long_data, "long_boxplot")
+    plot_and_save(lat_data, "lat_boxplot")
+
+    print("Done.")

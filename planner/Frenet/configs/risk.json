@@ -7,10 +7,12 @@
   "reduced_angle_areas": true,
   "trajectory_risk": "max",
   "max_acceptable_risk": 1,
+  "multiple_cost_functions": false,
 
   "scale_factor_time": 0.9,
   "crash_angle_accuracy": 10,
   "crash_angle_simplified": true,
+  "fast_prob_mahalanobis": false,
 
   "figures": {
     "create_figures": false,

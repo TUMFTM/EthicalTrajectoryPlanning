@@ -22,21 +22,28 @@ def get_obstacle_mass(obstacle_type, size):
     Returns:
         Mass (float): Estimated mass of considered obstacle.
     """
-    mass_mapping = {
-        ObstacleType.CAR: -1333.5 + 526.9 * np.power(size, 0.8),
-        ObstacleType.TRUCK: 25000,
-        ObstacleType.BUS: 13000,
-        ObstacleType.BICYCLE: 90,
-        ObstacleType.PEDESTRIAN: 75,
-        ObstacleType.PRIORITY_VEHICLE: -1333.5 + 526.9 * np.power(size, 0.8),
-        ObstacleType.PARKED_VEHICLE: -1333.5 + 526.9 * np.power(size, 0.8),
-        ObstacleType.TRAIN: 118800,
-        ObstacleType.MOTORCYCLE: 250,
-        ObstacleType.TAXI: -1333.5 + 526.9 * np.power(size, 0.8),
-        ObstacleType.UNKNOWN: 100,
-    }
-
-    return mass_mapping[obstacle_type]
+    if obstacle_type == ObstacleType.CAR:
+        return -1333.5 + 526.9 * np.power(size, 0.8)
+    elif obstacle_type == ObstacleType.TRUCK:
+        return 25000
+    elif obstacle_type == ObstacleType.BUS:
+        return 13000
+    elif obstacle_type == ObstacleType.BICYCLE:
+        return 90
+    elif obstacle_type == ObstacleType.PEDESTRIAN:
+        return 75
+    elif obstacle_type == ObstacleType.PRIORITY_VEHICLE:
+        return -1333.5 + 526.9 * np.power(size, 0.8)
+    elif obstacle_type == ObstacleType.PARKED_VEHICLE:
+        return -1333.5 + 526.9 * np.power(size, 0.8)
+    elif obstacle_type == ObstacleType.TRAIN:
+        return 118800
+    elif obstacle_type == ObstacleType.MOTORCYCLE:
+        return 250
+    elif obstacle_type == ObstacleType.TAXI:
+        return -1333.5 + 526.9 * np.power(size, 0.8)
+    else:
+        return 0
 
 
 def calc_delta_v(vehicle_1, vehicle_2, pdof):

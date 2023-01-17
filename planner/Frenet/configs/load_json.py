@@ -5,7 +5,7 @@ import numpy as np
 import os
 
 
-def load_risk_json():
+def load_risk_json(filename="risk.json"):
     """
     Load the risk.json with harm weights.
 
@@ -14,10 +14,12 @@ def load_risk_json():
     """
     risk_config_path = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
-        "risk.json",
+        filename,
     )
     with open(risk_config_path, "r") as f:
         jsondata = json.load(f)
+
+    print(f"Loaded settings from {risk_config_path}")
 
     return jsondata
 
@@ -52,7 +54,7 @@ def load_weight_json(filename="weights.json"):
     with open(weight_config_path, "r") as f:
         jsondata = json.load(f)
 
-    print(f"\nLoaded weights from {weight_config_path}")
+    print(f"Loaded weights from {weight_config_path}")
 
     return jsondata
 

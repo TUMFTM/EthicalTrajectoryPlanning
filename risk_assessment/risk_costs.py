@@ -3,13 +3,10 @@
 from EthicalTrajectoryPlanning.planner.Frenet.utils.validity_checks import create_collision_object
 from commonroad_dc.collision.trajectory_queries import trajectory_queries
 
-from EthicalTrajectoryPlanning.risk_assessment.harm_estimation import harm_model
+from EthicalTrajectoryPlanning.risk_assessment.harm_estimation import get_harm
 from EthicalTrajectoryPlanning.risk_assessment.collision_probability import (
-    get_collision_probability,
-)
-from EthicalTrajectoryPlanning.risk_assessment.helpers.properties import (
-    calc_crash_angle,
-    calc_crash_angle_simple,
+    get_collision_probability_fast,
+    get_inv_mahalanobis_dist
 )
 from EthicalTrajectoryPlanning.risk_assessment.helpers.timers import ExecTimer
 from EthicalTrajectoryPlanning.planner.utils.responsibility import assign_responsibility_by_action_space, calc_responsibility_reach_set
@@ -60,11 +57,20 @@ def calc_risk(
         "simulation/sort trajectories/calculate costs/calculate risk/"
         + "collision probability"
     ):
-        coll_prob_dict = get_collision_probability(
-            traj=traj,
-            predictions=predictions,
-            vehicle_params=vehicle_params,
-        )
+
+        if modes["fast_prob_mahalanobis"]:
+            coll_prob_dict = get_inv_mahalanobis_dist(
+                traj=traj,
+                predictions=predictions,
+                vehicle_params=vehicle_params,
+            )
+
+        else:
+            coll_prob_dict = get_collision_probability_fast(
+                traj=traj,
+                predictions=predictions,
+                vehicle_params=vehicle_params,
+            )
 
     ego_harm_traj, obst_harm_traj = get_harm(
         scenario, traj, predictions, ego_id, vehicle_params, modes, coeffs, timer
@@ -232,8 +238,9 @@ def get_responsibility_cost(scenario, traj, ego_state, obst_risk_max, prediction
         _type_: _description_
 
     """
+    bool_contain_cache = None
     if "reach_set" in mode and reach_set is not None:
-        resp_cost = calc_responsibility_reach_set(traj, ego_state, reach_set)
+        resp_cost, bool_contain_cache = calc_responsibility_reach_set(traj, ego_state, reach_set)
 
     else:
         # Assign responsibility to predictions
@@ -245,123 +252,4 @@ def get_responsibility_cost(scenario, traj, ego_state, obst_risk_max, prediction
         for key in predictions:
             resp_cost -= predictions[key]["responsibility"] * obst_risk_max[key]
 
-    return resp_cost
-
-
-def get_harm(scenario, traj, predictions, ego_id, vehicle_params, modes, coeffs, timer):
-    """Get harm.
-
-    Args:
-        scenario (_type_): _description_
-        traj (_type_): _description_
-        predictions (_type_): _description_
-        ego_id (_type_): _description_
-        vehicle_params (_type_): _description_
-        modes (_type_): _description_
-        coeffs (_type_): _description_
-        timer (_type_): _description_
-
-    Returns:
-        _type_: _description_
-    """
-    # get the IDs of the predicted obstacles
-    obstacle_ids = list(predictions.keys())
-
-    max_pred_length = 0
-
-    ego_harm_traj = {}
-    obst_harm_traj = {}
-    for obstacle_id in obstacle_ids:
-
-        # only calculate the risk as long as both obstacles are in the scenario
-        pred_path = predictions[obstacle_id]['pos_list']
-        pred_length = min(len(traj.t) - 1, len(pred_path))
-        if pred_length == 0:
-            continue
-
-        # get max prediction length
-        if pred_length > max_pred_length:
-            max_pred_length = pred_length
-
-        # get the size, the velocity and the orientation of the predicted
-        # vehicle
-        pred_size = (
-            predictions[obstacle_id]['shape']['length']
-            * predictions[obstacle_id]['shape']['width']
-        )
-        pred_v = predictions[obstacle_id]['v_list']
-        pred_yaw = predictions[obstacle_id]['orientation_list']
-
-        # lists to save ego and obstacle harm as well as ego and obstacle risk
-        # one list per obstacle
-        ego_harm_obst = []
-        obst_harm_obst = []
-
-        # calc crash angle if comprehensive mode selected
-        if modes["crash_angle_simplified"] is False:
-
-            with timer.time_with_cm(
-                "simulation/sort trajectories/calculate costs/calculate risk/"
-                + "calculate harm/calculate PDOF comp"
-            ):
-
-                pdof, ego_angle, obs_angle = calc_crash_angle(
-                    traj=traj,
-                    predictions=predictions,
-                    scenario=scenario,
-                    obstacle_id=obstacle_id,
-                    modes=modes,
-                    vehicle_params=vehicle_params,
-                )
-
-        # calc the risk for every time step
-        for i in range(pred_length):
-
-            # calc crash angle simplified if selected
-            if modes["crash_angle_simplified"] is True:
-
-                with timer.time_with_cm(
-                    "simulation/sort trajectories/calculate costs/calculate risk/"
-                    + "calculate harm/calculate PDOF simple"
-                ):
-
-                    pdof, ego_angle, obs_angle = calc_crash_angle_simple(
-                        traj=traj,
-                        predictions=predictions,
-                        obstacle_id=obstacle_id,
-                        time_step=i,
-                    )
-
-            with timer.time_with_cm(
-                "simulation/sort trajectories/calculate costs/calculate risk/"
-                + "calculate harm/harm_model"
-            ):
-
-                # get the harm ego harm and the harm of the collision opponent
-                ego_harm, obst_harm, ego_harm_data, obst_harm_data = harm_model(
-                    scenario=scenario,
-                    ego_vehicle_id=ego_id,
-                    vehicle_params=vehicle_params,
-                    ego_velocity=traj.v[i],
-                    ego_yaw=traj.yaw[i],
-                    obstacle_id=obstacle_id,
-                    obstacle_size=pred_size,
-                    obstacle_velocity=pred_v[i],
-                    obstacle_yaw=pred_yaw[i],
-                    pdof=pdof,
-                    ego_angle=ego_angle,
-                    obs_angle=obs_angle,
-                    modes=modes,
-                    coeffs=coeffs,
-                )
-
-                # store information to calculate harm and harm value in list
-                ego_harm_obst.append(ego_harm)
-                obst_harm_obst.append(obst_harm)
-
-        # store harm list for the obstacles in dictionary for current frenét
-        # trajectory
-        ego_harm_traj[obstacle_id] = ego_harm_obst
-        obst_harm_traj[obstacle_id] = obst_harm_obst
-
-    return ego_harm_traj, obst_harm_traj
+    return resp_cost, bool_contain_cache

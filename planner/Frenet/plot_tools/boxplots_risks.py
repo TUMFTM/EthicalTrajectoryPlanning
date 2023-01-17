@@ -5,6 +5,7 @@ import os
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 import numpy as np
+from colors import COLORS
 
 RAW_DATA_PATHS = [
     './planner/Frenet/RISK_VALUES/ethical.json',
@@ -14,28 +15,15 @@ RAW_DATA_PATHS = [
 
 NO_TOP_VALUES = 100
 
-BLACK = (0, 0, 0)
-DARK_GRAY = (0.2, 0.2, 0.2)
-TUM_BLUE = (0 / 255, 101 / 255, 189 / 255)
-TUM_BLUE_TRANS20 = (0 / 255, 101 / 255, 189 / 255, 0.2)
-TUM_BLUE_TRANS50 = (0 / 255, 101 / 255, 189 / 255, 0.5)
-TUM_DARKBLUE = (0 / 255, 82 / 255, 147 / 255)
-TUM_LIGHTBLUE = (100 / 255, 160 / 255, 200 / 255)
-TUM_ORANGE = (227 / 255, 114 / 255, 34 / 255)
-TUM_ORANGE_TRANS50 = (227 / 255, 114 / 255, 34 / 255, 0.5)
-TUM_GREEN = (162 / 255, 173 / 255, 0 / 255)
-TUM_GREEN_TRANS50 = (162 / 255, 173 / 255, 0 / 255, 0.5)
-
-
 # Create dictionary of keyword aruments to pass to plt.boxplot
 red_dict = {
     'patch_artist': True,
-    'boxprops': {"color": DARK_GRAY, "facecolor": TUM_BLUE_TRANS50},
-    'capprops': {"color": DARK_GRAY},
+    'boxprops': {"color": COLORS["DARK_GRAY"], "facecolor": COLORS["TUM_BLUE_TRANS50"]},
+    'capprops': {"color": COLORS["DARK_GRAY"]},
     "showfliers": False,
-    'flierprops': {"color": TUM_BLUE_TRANS20, "markeredgecolor": TUM_BLUE_TRANS20},
-    'medianprops': {"color": DARK_GRAY},
-    'whiskerprops': {"color": DARK_GRAY},
+    'flierprops': {"color": COLORS["TUM_BLUE_TRANS20"], "markeredgecolor": COLORS["TUM_BLUE_TRANS20"]},
+    'medianprops': {"color": COLORS["DARK_GRAY"]},
+    'whiskerprops': {"color": COLORS["DARK_GRAY"]},
 }
 
 
@@ -108,10 +96,10 @@ def box_plot(data, edge_color, fill_color, ax):
 
     for patch, key in zip(bp['boxes'], data.keys()):
         if "EGO" in key:
-            patch.set_facecolor(TUM_ORANGE_TRANS50)
+            patch.set_facecolor(COLORS["TUM_ORANGE_TRANS50"])
 
         elif "STANDARD" in key:
-            patch.set_facecolor(TUM_GREEN_TRANS50)
+            patch.set_facecolor(COLORS["TUM_GREEN_TRANS50"])
 
     return bp
 
@@ -129,7 +117,7 @@ sorted_keys = sorted(boxplot_data, key=lambda x: ord(x[-2]))
 boxplot_data_sorted = {key: boxplot_data[key] for key in sorted_keys}
 
 fig, ax = plt.subplots()
-bp = box_plot(boxplot_data_sorted, TUM_DARKBLUE, TUM_LIGHTBLUE, ax=ax)
+bp = box_plot(boxplot_data_sorted, COLORS["TUM_DARKBLUE"], COLORS["TUM_LIGHTBLUE"], ax=ax)
 
 ax.set_xticklabels(boxplot_data_sorted.keys(), rotation=90)
 
@@ -165,7 +153,7 @@ a_file.close()
 
 
 fig2, ax2 = plt.subplots()
-bp2 = box_plot(boxplot_data_high, TUM_DARKBLUE, TUM_LIGHTBLUE, ax=ax2)
+bp2 = box_plot(boxplot_data_high, COLORS["TUM_DARKBLUE"], COLORS["TUM_LIGHTBLUE"], ax=ax2)
 
 ax2.set_xticklabels(boxplot_data_high.keys(), rotation=90, fontsize=4)
 plt.savefig(

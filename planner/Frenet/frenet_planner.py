@@ -88,6 +88,7 @@ class FrenetPlanner(Planner):
         sensor_radius: float = 50.0,
         plot_frenet_trajectories: bool = False,
         weights=None,
+        settings=None,
     ):
         """
         Initialize a frenét planner.
@@ -134,12 +135,16 @@ class FrenetPlanner(Planner):
                 self.p = vehicle_params
 
                 # load parameters
-                self.params_mode = load_risk_json()
                 self.params_harm = load_harm_parameter_json()
                 if weights is None:
                     self.params_weights = load_weight_json()
                 else:
                     self.params_weights = weights
+                if settings is not None:
+                    if "risk_dict" in settings:
+                        self.params_mode = settings["risk_dict"]
+                    else:
+                        self.params_mode = load_risk_json()
 
                 self.params_dict = {
                     'weights': self.params_weights,
@@ -572,13 +577,13 @@ class FrenetPlanner(Planner):
 
 
 if __name__ == "__main__":
-
     import argparse
     from planner.plannertools.evaluate import ScenarioEvaluator
     from planner.Frenet.plannertools.frenetcreator import FrenetCreator
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--scenario", default="recorded/hand-crafted/ZAM_Tjunction-1_486_T-1.xml")
+    parser.add_argument("--time", action="store_true")
     args = parser.parse_args()
 
     if "commonroad" in args.scenario:
@@ -588,7 +593,9 @@ if __name__ == "__main__":
 
     # load settings from planning_fast.json
     settings_dict = load_planning_json("planning_fast.json")
-    settings_dict["evaluation_settings"]["show_visualization"] = True
+    settings_dict["risk_dict"] = risk_dict = load_risk_json()
+    if not args.time:
+        settings_dict["evaluation_settings"]["show_visualization"] = True
     eval_directory = (
         pathlib.Path(__file__).resolve().parents[0].joinpath("results").joinpath("eval")
     )
@@ -607,5 +614,20 @@ if __name__ == "__main__":
         timing_enabled=settings_dict["evaluation_settings"]["timing_enabled"],
     )
 
-    _ = evaluator.eval_scenario(scenario_path)
+    def main():
+        """Loop for cProfile."""
+        _ = evaluator.eval_scenario(scenario_path)
+
+    if args.time:
+        import cProfile
+        cProfile.run('main()', "output.dat")
+        no_trajectores = settings_dict["frenet_settings"]["frenet_parameters"]["n_v_samples"] * len(settings_dict["frenet_settings"]["frenet_parameters"]["d_list"])
+        import pstats
+        sortby = pstats.SortKey.CUMULATIVE
+        with open(f"cProfile/{scenario_path.split('/')[-1]}_{no_trajectores}.txt", "w") as f:
+            p = pstats.Stats("output.dat", stream=f).sort_stats(sortby)
+            p.sort_stats(sortby).print_stats()
+    else:
+        main()
+
 # EOF

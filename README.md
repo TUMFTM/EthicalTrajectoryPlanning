@@ -69,7 +69,7 @@ By default logs are saved and can be analyzed afterwards by running:
 
 ## How to reproduce results
 
-The idea and basic principles of this algorithm are presented in Geisslinger et al. 2022<sup>1</sup>. The following describes how the results from the paper can be reproduced. To evaluate the planning algorithm on multiple scenarios execute:
+The idea and basic principles of this algorithm are presented in Geisslinger et al. 2023<sup>1</sup>. The following describes how the results from the paper can be reproduced. To evaluate the planning algorithm on multiple scenarios execute:
 
 * `python planner/Frenet/plannertools/evaluatefrenet.py`
 
@@ -81,16 +81,18 @@ To evaluate with the according config settings of [ethical](/planner/Frenet/conf
 
 To evaluate on all 2000 scenarios, make sure to have at least 200 GB space left on your device for saving the log files. For better runtime, we recommend using [multiprocessing](/planner/Frenet/plannertools/evaluatefrenet.py#L46) and a [GPU](planner/Frenet/configs/prediction.json#L4) for the prediction network. Evaluating all scenarios in 10 parallel threads with a GPU takes around 48 hours. Results and logfiles for each run are stored in `planner/Frenet/results`.
 
-Standard evaluation metrics such as cummulated harm on all scenarios are provided within the results (e.g. `results/eval/harm.json`). `planner/Frenet/analyze_tools/analyze_risk_dist.py` helps to extract risk values out of multiple logfiles. Boxplots with risk distribtuions as in Geisslinger et al. 2022<sup>1</sup> can be generated using `planner/Frenet/plot_tools/boxplots_risks.py`.
+Standard evaluation metrics such as cummulated harm on all scenarios are provided within the results (e.g. `results/eval/harm.json`). `planner/Frenet/analyze_tools/analyze_risk_dist.py` helps to extract risk values out of multiple logfiles. Boxplots with risk distribtuions as in Geisslinger et al. 2023<sup>1</sup> can be generated using `planner/Frenet/plot_tools/boxplots_risks.py`.
 
 
 ## References
 
-1. Geisslinger, M., Poszler, F., Lienkamp, M. An Ethical Trajectory Planning Algorithm for Autonomous Vehicles *(under review)*
+1. Geisslinger, M., Poszler, F., Lienkamp, M. An Ethical Trajectory Planning Algorithm for Autonomous Vehicles. 2023
 
 ## Contributions
 * Maximilian Geisslinger (Main Contributor, [maximilian.geisslinger@tum.de](mailto:maximilian.geisslinger@tum.de?subject=[GitHub]%20Ethical%20Trajectory%20Planning))
+* Rainer Trauth (Computing Performance)
 * Florian Pfab (Master Thesis: *Motion Planning with Risk Assessment for Automated Vehicles*)
 * Simon Sagmeister (Master Thesis: *Neural Networks: Real-time Capable Trajectory Planning through Supervised Learning*)
 * Tobias Geissenberger (Bachelor Thesis: *Harm Prediction for Risk-Aware Motion Planning of Automated Vehicles*)
 * Clemens Krispler (Bachelor Thesis: *Motion Planning for Autonomous Vehicles: Developing a Principle of Responsibility for Ethical Decision-Making*)
+* Zhi Zheng (Semester Thesis: *Parallelization of a Planning Algorithm in the Field of Autonomous Driving* supervised by Rainer Trauth)
