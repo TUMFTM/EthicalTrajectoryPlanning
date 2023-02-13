@@ -12,7 +12,7 @@ This repository includes comprehensive ethical trajectory planning software. Its
 
 ## System Requirements
 * Operating System: Linux Ubuntu (tested on 20.04)
-* Programming Language: Python >= 3.6 (tested on 3.6 and 3.8)
+* Programming Language: Python >= 3.7 (tested on 3.8)
 * [Software Dependencies](/requirements.txt)
 
 ## Installation
