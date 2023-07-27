@@ -87,6 +87,7 @@ Standard evaluation metrics such as cummulated harm on all scenarios are provide
 ## References
 
 1. Geisslinger, M., Poszler, F. & Lienkamp, M. An ethical trajectory planning algorithm for autonomous vehicles. Nat Mach Intell (2023). https://doi.org/10.1038/s42256-022-00607-z
+2. Geisslinger, M., Trauth, R., Kaljavesi G. & Lienkamp M. Maximum Acceptable Risk as Criterion for Decision-Making in Autonomous Vehicle Trajectory Planning. IEEE Open Journal of Intelligent Transportation Systems (2023). DOI:10.1109/OJITS.2023.3298973
 
 ## Contributions
 * Maximilian Geisslinger (Main Contributor, [maximilian.geisslinger@tum.de](mailto:maximilian.geisslinger@tum.de?subject=[GitHub]%20Ethical%20Trajectory%20Planning))
